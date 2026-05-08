@@ -7,15 +7,10 @@ Interactive simulation tool for two many-body quantum systems, built as a single
 
 ## Live demo
 
-Deployed on Streamlit Community Cloud: **<https://YOUR-APP-NAME.streamlit.app>**
+Deployed on Streamlit Community Cloud: **[<https://YOUR-APP-NAME.streamlit.app>](https://heisenberg-bf-mixture-e4ra4wffpc5jr63fcx6xfb.streamlit.app/)**
 
 *(Replace this link with your actual deployment URL once it's up.)*
 
-## Screenshots
-
-| Phase 1 — 4×4 Heisenberg | Phase 2 — BF mixture |
-|---|---|
-| ![phase1](screenshots/phase1_4x4.png) | ![phase2](screenshots/phase2.png) |
 
 ## Run locally
 
