@@ -48,6 +48,15 @@ CACHE_DIR = os.path.join(HERE, "_cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 
+def safe_tight_layout(fig):
+    """Use tight_layout when possible, but do not let Matplotlib crash Streamlit."""
+    try:
+        fig.tight_layout()
+    except Exception:
+        fig.subplots_adjust(left=0.10, right=0.95, bottom=0.14, top=0.90,
+                            wspace=0.30)
+
+
 # =============================================================================
 #  Phase-1 helpers  (cached)
 # =============================================================================
@@ -77,20 +86,6 @@ def saturation_field_estimate(Lx: int, Ly: int) -> float:
     if Lx == 2 and Ly == 2:
         return 2.0          # z = 2 on the 4-cycle
     return 4.0              # z = 4 on a true square lattice (4x4, 6x6)
-
-
-def safe_tight_layout(fig):
-    """Apply Matplotlib tight_layout without crashing the Streamlit app.
-
-    Streamlit Cloud can be stricter about Matplotlib text rendering than a
-    local notebook/session. The plots below therefore use plain-text labels,
-    and this helper prevents a layout-only issue from taking down the app.
-    """
-    try:
-        fig.tight_layout()
-    except Exception:
-        fig.subplots_adjust(left=0.10, right=0.95, bottom=0.14, top=0.90,
-                            wspace=0.30)
 
 
 # =============================================================================
@@ -170,6 +165,12 @@ if page == "Phase 1 - Heisenberg ED":
         Lx, Ly, k_per, sector_max_D = 6, 6, 4, 2_000_000
 
     # ------ compute ------
+    if Lx == 6:
+        st.warning(
+            "6x6 partial ED can be slow or memory-heavy on Streamlit Cloud. "
+            "If the app resets, use 2x2 or 4x4 online and run 6x6 locally."
+        )
+
     with st.spinner(f"Diagonalising {size_label}..."):
         N, n_bonds, spectra = get_phase1_spectra(
             Lx, Ly, k_per, sector_max_D
@@ -420,43 +421,56 @@ density.
         )
 
     # ------ finite-size overlay --------------------------------------
-    with st.expander("Finite-size overlay: 2×2 vs 4×4 vs 6×6", expanded=False):
+    with st.expander("Finite-size overlay: 2x2 vs 4x4 vs 6x6", expanded=False):
         st.caption(
-            "All three lattices on one plot. Notice how the plateau "
-            "structure becomes finer as N grows, foreshadowing the smooth "
-            "thermodynamic-limit curve. The 6×6 curve is only plotted in "
-            "its trustworthy region (above its data threshold)."
+            "This comparison is not computed automatically on Streamlit Cloud. "
+            "Code inside an expander still executes during page load, so an "
+            "automatic 6x6 calculation can make the app fail its health check."
         )
-        _, _, sp2 = get_phase1_spectra(2, 2, 20, None)
-        _, _, sp4 = get_phase1_spectra(4, 4, 6, None)
-        _, _, sp6 = get_phase1_spectra(6, 6, 4, 2_000_000)
-        h_overlay = np.linspace(0.0, 6.0, 601)
-        _, Mz2, _ = magnetization_curve(sp2, h_overlay, 4)
-        _, Mz4, _ = magnetization_curve(sp4, h_overlay, 16)
-        _, Mz6, _ = magnetization_curve(sp6, h_overlay, 36)
+        include_6x6 = st.checkbox(
+            "Include 6x6 curve (slow; use only after 2x2 and 4x4 work)",
+            value=False,
+        )
+        run_overlay = st.button("Compute finite-size overlay")
 
-        # 6x6 is only reliable above its trust threshold
-        h_trust6 = trust_field_h(sp6, h_overlay, 36)
+        if run_overlay:
+            with st.spinner("Computing finite-size overlay..."):
+                _, _, sp2 = get_phase1_spectra(2, 2, 20, None)
+                _, _, sp4 = get_phase1_spectra(4, 4, 6, None)
+                sp6 = None
+                if include_6x6:
+                    _, _, sp6 = get_phase1_spectra(6, 6, 4, 2_000_000)
 
-        fig2, ax2 = plt.subplots(figsize=(8, 4.6))
-        ax2.plot(h_overlay, Mz2, lw=2, label="2×2  (N=4)")
-        ax2.plot(h_overlay, Mz4, lw=2, label="4×4  (N=16)")
-        if np.isfinite(h_trust6) and h_trust6 > 0.0:
-            mask6 = h_overlay >= h_trust6
-            ax2.plot(h_overlay[mask6], Mz6[mask6], lw=2,
-                     label=f"6×6  (reliable for H/J ≥ {h_trust6:.2f})")
+                h_overlay = np.linspace(0.0, 6.0, 601)
+                _, Mz2, _ = magnetization_curve(sp2, h_overlay, 4)
+                _, Mz4, _ = magnetization_curve(sp4, h_overlay, 16)
+
+            fig2, ax2 = plt.subplots(figsize=(8, 4.6))
+            ax2.plot(h_overlay, Mz2, lw=2, label="2x2  (N=4)")
+            ax2.plot(h_overlay, Mz4, lw=2, label="4x4  (N=16)")
+
+            if sp6 is not None:
+                _, Mz6, _ = magnetization_curve(sp6, h_overlay, 36)
+                h_trust6 = trust_field_h(sp6, h_overlay, 36)
+                if np.isfinite(h_trust6) and h_trust6 > 0.0:
+                    mask6 = h_overlay >= h_trust6
+                    ax2.plot(h_overlay[mask6], Mz6[mask6], lw=2,
+                             label=f"6x6  (reliable for H/J >= {h_trust6:.2f})")
+                else:
+                    ax2.plot(h_overlay, Mz6, lw=2, label="6x6  (N=36)")
+
+            ax2.axvline(4.0, color="k", ls="--", lw=1, alpha=0.5,
+                        label="H_sat / J = 4")
+            ax2.set_xlabel("H / J")
+            ax2.set_ylabel("<Mz>")
+            ax2.set_ylim(-0.02, 0.55)
+            ax2.set_title("Finite-size scaling of the magnetisation curve")
+            ax2.grid(alpha=0.3)
+            ax2.legend(loc="lower right")
+            safe_tight_layout(fig2)
+            st.pyplot(fig2)
         else:
-            ax2.plot(h_overlay, Mz6, lw=2, label="6×6  (N=36)")
-        ax2.axvline(4.0, color="k", ls="--", lw=1, alpha=0.5,
-                    label="H_sat/J = 4")
-        ax2.set_xlabel("H / J")
-        ax2.set_ylabel("<Mz>")
-        ax2.set_ylim(-0.02, 0.55)
-        ax2.set_title("Finite-size scaling of the magnetisation curve")
-        ax2.grid(alpha=0.3)
-        ax2.legend(loc="lower right")
-        safe_tight_layout(fig2)
-        st.pyplot(fig2)
+            st.info("Click the button above to generate the overlay. Start without 6x6 on Streamlit Cloud.")
 
 
 # =============================================================================
@@ -547,8 +561,8 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
     else:
         regime = "attractive  (BEC pulls fermions inward)"
     ax.set_title(f"Density profiles - g_BF={g_BF:+.4f} ({regime})")
-    ax.set_xlabel("r / a_ho^(B)")
-    ax.set_ylabel("density [a_ho^(B)]^-3")
+    ax.set_xlabel("r / a_ho(B)")
+    ax.set_ylabel("density [a_ho(B)]^-3")
     ax.grid(alpha=0.3)
     ax.legend()
     safe_tight_layout(fig)
@@ -599,7 +613,7 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
     if st.button("Run comparison"):
         labels = [
             (f"attractive  g_BF=-{base_g:.3f}", -base_g),
-            (f"non-interacting  g_BF=0",         0.0),
+            ("non-interacting  g_BF=0",         0.0),
             (f"repulsive  g_BF=+{base_g:.3f}", +base_g),
         ]
         results = []
@@ -629,7 +643,7 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
                     ha="right", va="top", fontsize=8,
                     bbox=dict(boxstyle="round,pad=0.4",
                               fc="white", ec="grey", alpha=0.85))
-        axes[0].set_ylabel(r"density")
+        axes[0].set_ylabel("density")
         safe_tight_layout(fig)
         st.pyplot(fig)
 
