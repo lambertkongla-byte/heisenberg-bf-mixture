@@ -79,6 +79,20 @@ def saturation_field_estimate(Lx: int, Ly: int) -> float:
     return 4.0              # z = 4 on a true square lattice (4x4, 6x6)
 
 
+def safe_tight_layout(fig):
+    """Apply Matplotlib tight_layout without crashing the Streamlit app.
+
+    Streamlit Cloud can be stricter about Matplotlib text rendering than a
+    local notebook/session. The plots below therefore use plain-text labels,
+    and this helper prevents a layout-only issue from taking down the app.
+    """
+    try:
+        fig.tight_layout()
+    except Exception:
+        fig.subplots_adjust(left=0.10, right=0.95, bottom=0.14, top=0.90,
+                            wspace=0.30)
+
+
 # =============================================================================
 #  Phase-2 helpers  (cached)
 # =============================================================================
@@ -191,7 +205,7 @@ if page == "Phase 1 - Heisenberg ED":
         plot_label_kind = "All eigenstates"
     else:
         n_per_sector = 1
-        plot_label_kind = "Ground state of each $S^z$ sector"
+        plot_label_kind = "Ground state of each Sz sector"
 
     levels, sz_levels, e0_levels, _ = per_sector_ground_states(
         spectra, h_array, N, n_per_sector=n_per_sector
@@ -215,12 +229,12 @@ if page == "Phase 1 - Heisenberg ED":
                      color=cmap(norm(sz_levels[j])), alpha=0.8)
     axes[0].plot(h_array, Egs, "k--", lw=1.8, alpha=0.95,
                  label="ground state (envelope)")
-    axes[0].set_xlabel(r"$H / J$")
-    axes[0].set_ylabel(r"$E / J$")
+    axes[0].set_xlabel("H / J")
+    axes[0].set_ylabel("E / J")
     if N <= 4:
         title = f"All {n_lines_drawn} eigenstates"
     else:
-        title = (f"Ground state of each $S^z$ sector  "
+        title = (f"Ground state of each Sz sector  "
                  f"({n_lines_drawn} of {N + 1} sectors)")
     axes[0].set_title(title)
     axes[0].grid(alpha=0.3)
@@ -228,7 +242,7 @@ if page == "Phase 1 - Heisenberg ED":
     sm = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
     sm.set_array([])
     cbar = fig.colorbar(sm, ax=axes[0], pad=0.02, shrink=0.85)
-    cbar.set_label(r"$S^z_\mathrm{tot}$")
+    cbar.set_label("Sz_tot")
 
     # ----- right panel: magnetization curve ---------------------------
     if has_skipped:
@@ -252,8 +266,8 @@ if page == "Phase 1 - Heisenberg ED":
         axes[1].legend(loc="lower right", fontsize=8)
     else:
         axes[1].plot(h_array, Mz, lw=2, color="C3")
-    axes[1].set_xlabel(r"$H / J$")
-    axes[1].set_ylabel(r"$\langle M^z \rangle$")
+    axes[1].set_xlabel("H / J")
+    axes[1].set_ylabel("<Mz>")
     axes[1].set_title("Magnetisation curve")
     axes[1].set_ylim(-0.02, 0.55)
     axes[1].grid(alpha=0.3)
@@ -266,7 +280,7 @@ if page == "Phase 1 - Heisenberg ED":
             ax.axvspan(0.0, h_trust, color="#cfe2ff", alpha=0.5, zorder=-1)
             ax.axvline(h_trust, color="#4a8de0", lw=1, alpha=0.6, ls=":")
 
-    fig.tight_layout()
+    safe_tight_layout(fig)
     st.pyplot(fig)
 
     # ----- explanation text ------------------------------------------
@@ -434,14 +448,14 @@ density.
         else:
             ax2.plot(h_overlay, Mz6, lw=2, label="6×6  (N=36)")
         ax2.axvline(4.0, color="k", ls="--", lw=1, alpha=0.5,
-                    label=r"$H_{\rm sat}/J = 4$")
-        ax2.set_xlabel(r"$H / J$")
-        ax2.set_ylabel(r"$\langle M^z \rangle$")
+                    label="H_sat/J = 4")
+        ax2.set_xlabel("H / J")
+        ax2.set_ylabel("<Mz>")
         ax2.set_ylim(-0.02, 0.55)
         ax2.set_title("Finite-size scaling of the magnetisation curve")
         ax2.grid(alpha=0.3)
         ax2.legend(loc="lower right")
-        fig2.tight_layout()
+        safe_tight_layout(fig2)
         st.pyplot(fig2)
 
 
@@ -523,21 +537,21 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
     # ------ density profile ------
     fig, ax = plt.subplots(figsize=(8.2, 4.5))
     ax.plot(out["r"], out["n_B"], "b-", lw=2,
-            label=fr"Bosons,  $N_B = {int(N_B)}$")
+            label=f"Bosons, N_B = {int(N_B)}")
     ax.plot(out["r"], out["n_F"], "r-", lw=2,
-            label=fr"Fermions,  $N_F = {int(N_F)}$")
+            label=f"Fermions, N_F = {int(N_F)}")
     if g_BF == 0.0:
         regime = "non-interacting"
     elif g_BF > 0.0:
         regime = "repulsive  (BEC pushes fermions outward)"
     else:
         regime = "attractive  (BEC pulls fermions inward)"
-    ax.set_title(fr"Density profiles  -  $g_{{BF}}={g_BF:+.4f}$  ({regime})")
-    ax.set_xlabel(r"$r\,/\,a_{\rm ho}^{(B)}$")
-    ax.set_ylabel(r"density  $\;[a_{\rm ho}^{(B)}]^{-3}$")
+    ax.set_title(f"Density profiles - g_BF={g_BF:+.4f} ({regime})")
+    ax.set_xlabel("r / a_ho^(B)")
+    ax.set_ylabel("density [a_ho^(B)]^-3")
     ax.grid(alpha=0.3)
     ax.legend()
-    fig.tight_layout()
+    safe_tight_layout(fig)
     st.pyplot(fig)
 
     # ------ observables ------
@@ -584,9 +598,9 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
                        format="%.3f")
     if st.button("Run comparison"):
         labels = [
-            (rf"attractive  $g_{{BF}}=-{base_g:.3f}$", -base_g),
-            (rf"non-interacting  $g_{{BF}}=0$",         0.0),
-            (rf"repulsive  $g_{{BF}}=+{base_g:.3f}$", +base_g),
+            (f"attractive  g_BF=-{base_g:.3f}", -base_g),
+            (f"non-interacting  g_BF=0",         0.0),
+            (f"repulsive  g_BF=+{base_g:.3f}", +base_g),
         ]
         results = []
         with st.spinner("Solving three regimes..."):
@@ -601,22 +615,22 @@ elif page == "Phase 2 - Bose-Fermi Mixture":
         for ax, (label, gbf, res) in zip(axes, results):
             ax.plot(res["r"], res["n_B"], "b-", lw=2, label="bosons")
             ax.plot(res["r"], res["n_F"], "r-", lw=2, label="fermions")
-            ax.set_xlabel(r"$r$")
+            ax.set_xlabel("r")
             ax.set_title(label)
             ax.grid(alpha=0.3)
             ax.legend()
             box = (
-                f"$\\mu_B={res['mu_B']:.2f}$\n"
-                f"$\\mu_F={res['mu_F']:.2f}$\n"
-                f"$R_B={res['R_B']:.2f}$\n"
-                f"$R_F={res['R_F']:.2f}$"
+                f"mu_B={res['mu_B']:.2f}\n"
+                f"mu_F={res['mu_F']:.2f}\n"
+                f"R_B={res['R_B']:.2f}\n"
+                f"R_F={res['R_F']:.2f}"
             )
             ax.text(0.97, 0.97, box, transform=ax.transAxes,
                     ha="right", va="top", fontsize=8,
                     bbox=dict(boxstyle="round,pad=0.4",
                               fc="white", ec="grey", alpha=0.85))
         axes[0].set_ylabel(r"density")
-        fig.tight_layout()
+        safe_tight_layout(fig)
         st.pyplot(fig)
 
 
