@@ -410,7 +410,8 @@ density.
         st.caption(
             "All three lattices on one plot. Notice how the plateau "
             "structure becomes finer as N grows, foreshadowing the smooth "
-            "thermodynamic-limit curve."
+            "thermodynamic-limit curve. The 6×6 curve is only plotted in "
+            "its trustworthy region (above its data threshold)."
         )
         _, _, sp2 = get_phase1_spectra(2, 2, 20, None)
         _, _, sp4 = get_phase1_spectra(4, 4, 6, None)
@@ -419,10 +420,19 @@ density.
         _, Mz2, _ = magnetization_curve(sp2, h_overlay, 4)
         _, Mz4, _ = magnetization_curve(sp4, h_overlay, 16)
         _, Mz6, _ = magnetization_curve(sp6, h_overlay, 36)
+
+        # 6x6 is only reliable above its trust threshold
+        h_trust6 = trust_field_h(sp6, h_overlay, 36)
+
         fig2, ax2 = plt.subplots(figsize=(8, 4.6))
         ax2.plot(h_overlay, Mz2, lw=2, label="2×2  (N=4)")
         ax2.plot(h_overlay, Mz4, lw=2, label="4×4  (N=16)")
-        ax2.plot(h_overlay, Mz6, lw=2, label="6×6  (N=36, partial)")
+        if np.isfinite(h_trust6) and h_trust6 > 0.0:
+            mask6 = h_overlay >= h_trust6
+            ax2.plot(h_overlay[mask6], Mz6[mask6], lw=2,
+                     label=f"6×6  (reliable for H/J ≥ {h_trust6:.2f})")
+        else:
+            ax2.plot(h_overlay, Mz6, lw=2, label="6×6  (N=36)")
         ax2.axvline(4.0, color="k", ls="--", lw=1, alpha=0.5,
                     label=r"$H_{\rm sat}/J = 4$")
         ax2.set_xlabel(r"$H / J$")
