@@ -89,4 +89,4 @@ The first build takes ~2–3 minutes. Subsequent pushes auto-redeploy within ~30
 
 ## License
 
-MIT — feel free to use, modify, or fork.
+Feel free to use, modify, or fork.
